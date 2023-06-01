@@ -91,6 +91,7 @@ HEADERS += \
     $$PWD/src/hb-shaper-impl.hh \
     $$PWD/src/hb-shaper-list.hh \
     $$PWD/src/hb-string-array.hh \
+    $$PWD/src/hb-subset-plan-member-list.hh \
     $$PWD/src/hb-subset-repacker.h \
     $$PWD/src/hb-unicode.hh
 
