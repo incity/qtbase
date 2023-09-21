@@ -54,12 +54,12 @@
 
 #include <QtCore/private/qglobal_p.h>
 
-QT_BEGIN_NAMESPACE
-
 // note to maintainer:
 // this file should be updated before each release ->
 // for instructions see the program at
 // util/corelib/qurl-generateTLDs/
+
+QT_BEGIN_NAMESPACE
 
 static const quint16 tldCount = 9106;
 static const quint32 tldIndices[] = {
