@@ -13,7 +13,7 @@ include($$PWD/../common.pri)
 SOURCES = $$JPEG_SOURCES
 
 objdir = $$OBJECTS_DIR
-android {
+android:!single_android_abi {
     objdir = $$objdir/$${QT_ARCH}
 }
 windows|qtConfig(debug_and_release) {
