@@ -20,7 +20,8 @@ from localetools import names_clash
 from qlocalexml import Locale
 
 class CldrReader (object):
-    def __init__(self, root: Path, grumble = lambda msg: None, whitter = lambda msg: None):
+    def __init__(self, root: Path, grumble: Callable[[str], int] = lambda msg: 0,
+                 whitter: Callable[[str], int] = lambda msg: 0) -> None:
         """Set up a reader object for reading CLDR data.
 
         Single parameter, root, is the file-system path to the root of
@@ -37,7 +38,8 @@ class CldrReader (object):
         self.whitter, self.grumble = whitter, grumble
         self.root.checkEnumData(grumble)
 
-    def likelySubTags(self):
+    def likelySubTags(self) -> Iterator[tuple[tuple[int, int, int, int],
+                                              tuple[int, int, int, int]]]:
         """Generator for likely subtag information.
 
         Yields pairs (have, give) of 4-tuples; if what you have
@@ -48,8 +50,8 @@ class CldrReader (object):
         skips = []
         for got, use in self.root.likelySubTags():
             try:
-                have = self.__parseTags(got)
-                give = self.__parseTags(use)
+                have: tuple[int, int, int, int] = self.__parseTags(got)
+                give: tuple[int, int, int, int] = self.__parseTags(use)
             except Error as e:
                 if ((use.startswith(got) or got.startswith('und_'))
                     and e.message.startswith('Unknown ') and ' code ' in e.message):
@@ -74,7 +76,12 @@ class CldrReader (object):
             # more out.
             pass # self.__wrapped(self.whitter, 'Skipping likelySubtags (for unknown codes): ', skips)
 
-    def zoneData(self):
+    def zoneData(self) -> tuple[dict[str, str],
+                                dict[str, str],
+                                dict[tuple[str, str], str],
+                                dict[str, dict[str, str]],
+                                dict[str, tuple[tuple[int, int, str], ...]],
+                                dict[str, str]]:
         """Locale-independent timezone data.
 
         Returns a triple (alias, defaults, winIds) in which:
@@ -99,7 +106,7 @@ class CldrReader (object):
         defaults, winIds = self.root.readWindowsTimeZones(alias)
 
         from zonedata import windowsIdList
-        winUnused = set(n for n, o in windowsIdList).difference(
+        winUnused: set[str] = set(n for n, o in windowsIdList).difference(
             set(defaults).union(w for w, t, ids in winIds))
         if winUnused:
             joined = "\n\t".join(winUnused)
@@ -109,7 +116,7 @@ class CldrReader (object):
 
         # Check for duplicate entries in winIds:
         last: tuple[str, str, str] = ('', '', '')
-        winDup = {}
+        winDup: dict[tuple[str, str], list[str]] = {}
         for triple in sorted(winIds):
             if triple[:2] == last[:2]:
                 try:
@@ -143,15 +150,16 @@ class CldrReader (object):
             winIds = [(w, t, ids) for w, t, ids in winIds if t not in unLand]
 
         # Convert list of triples to mapping:
-        winIds = {(w, t): ids for w, t, ids in winIds}
+        winIds: dict[tuple[str, str], str] = {(w, t): ids for w, t, ids in winIds}
         return alias, defaults, winIds
 
-    def readLocales(self, calendars = ('gregorian',)):
+    def readLocales(self, calendars: Iterable[str] = ('gregorian',)
+                    ) -> dict[tuple[int, int, int, int], Locale]:
         return {(k.language_id, k.script_id, k.territory_id, k.variant_id): k
                 for k in self.__allLocales(calendars)}
 
-    def __allLocales(self, calendars):
-        def skip(locale, reason):
+    def __allLocales(self, calendars: list[str]) -> Iterator[Locale]:
+        def skip(locale: str, reason: str) -> str:
             return f'Skipping defaultContent locale "{locale}" ({reason})\n'
 
         for locale in self.root.defaultContentLocales:
@@ -193,14 +201,14 @@ class CldrReader (object):
 
     import textwrap
     @staticmethod
-    def __wrapped(writer, prefix, tokens, wrap = textwrap.wrap):
+    def __wrapped(writer, prefix, tokens, wrap = textwrap.wrap) -> None:
         writer('\n'.join(wrap(prefix + ', '.join(tokens),
                               subsequent_indent=' ', width=80)) + '\n')
     del textwrap
 
-    def __parseTags(self, locale):
-        tags = self.__splitLocale(locale)
-        language = next(tags)
+    def __parseTags(self, locale: str) -> tuple[int, int, int, int]:
+        tags: Iterator[str] = self.__splitLocale(locale)
+        language: str = next(tags)
         script = territory = variant = ''
         try:
             script, territory, variant = tags
@@ -208,7 +216,7 @@ class CldrReader (object):
             pass
         return tuple(p[1] for p in self.root.codesToIdName(language, script, territory, variant))
 
-    def __splitLocale(self, name):
+    def __splitLocale(self, name: str) ->  Iterator[str]:
         """Generate (language, script, territory, variant) from a locale name
 
         Ignores any trailing fields (with a warning), leaves script (a
@@ -217,11 +225,11 @@ class CldrReader (object):
         empty if unspecified.  Only generates one entry if name is a
         single tag (i.e. contains no underscores).  Always yields 1 or
         4 values, never 2 or 3."""
-        tags = iter(name.split('_'))
+        tags: Iterator[str] = iter(name.split('_'))
         yield next(tags) # Language
 
         try:
-            tag = next(tags)
+            tag: str = next(tags)
         except StopIteration:
             return
 
@@ -258,7 +266,8 @@ class CldrReader (object):
         if rest:
             self.grumble(f'Ignoring unparsed cruft {"_".join(rest)} in {name}\n')
 
-    def __getLocaleData(self, scan, calendars, language, script, territory, variant):
+    def __getLocaleData(self, scan: LocaleScanner, calendars: list[str], language: str,
+                        script: str, territory: str, variant: str) -> Locale:
         ids, names = zip(*self.root.codesToIdName(language, script, territory, variant))
         assert ids[0] > 0 and ids[2] > 0, (language, script, territory, variant)
         locale = Locale(
