@@ -196,8 +196,13 @@ bool QUndoCommand::mergeWith(const QUndoCommand *command)
 
 void QUndoCommand::redo()
 {
-    for (int i = 0; i < d->child_list.size(); ++i)
+    for (int i = 0; i < d->child_list.size();) {
         d->child_list.at(i)->redo();
+        if (d->child_list.at(i)->isObsolete())
+            delete d->child_list.takeAt(i);
+        else
+            ++i;
+    }
 }
 
 /*!
@@ -214,8 +219,11 @@ void QUndoCommand::redo()
 
 void QUndoCommand::undo()
 {
-    for (int i = d->child_list.size() - 1; i >= 0; --i)
+    for (int i = d->child_list.size() - 1; i >= 0; --i) {
         d->child_list.at(i)->undo();
+        if (d->child_list.at(i)->isObsolete())
+            delete d->child_list.takeAt(i);
+    }
 }
 
 /*!
